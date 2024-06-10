@@ -1,0 +1,217 @@
+@font-face {
+  font-family: "Minecraft";
+  src: url("../fonts/MinecraftRegular-Bmg3.otf");
+}
+
+@font-face {
+  font-family: "Mchmc";
+  src: url("../fonts/Minecraftchmc-dBlX.ttf");
+}
+
+@font-face {
+  font-family: "SmReg";
+  src: url("../fonts/SgaSmoothRegular-DO0Y3.ttf");
+}
+
+* {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: linear-gradient(
+    180deg,
+    rgba(88, 21, 105, 1) 0%,
+    rgb(85, 0, 116) 42%,
+    rgb(61, 0, 114) 100%
+  );
+  background-color: rgb(88, 21, 105);
+  background-repeat: no-repeat;
+  min-height: 100vh;
+  overflow: hidden;
+}
+/* nav */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+.logo {
+  margin-top: -200px;
+}
+.navHome {
+  font-family: Mchmc;
+  padding: 2px;
+  margin: 2px;
+  display: flex;
+  margin-top: -100px;
+  font-size: 35px;
+  color: white;
+
+}
+
+/* nav */
+
+/* estilo dos botões */
+.btnstyle {
+  font-family: Mchmc;
+  padding: 5px;
+  width: 150px;
+  height: 50px;
+  border-top: 5px solid #a267f3;
+  border-bottom: 5px solid #491bb1;
+  border-left: 1px solid black;
+  border-right: 1px solid black;
+  font-size: 35px;
+  color: white;
+  background-color: #6241d9;
+}
+.btnhome{
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 30px;
+  cursor: pointer;
+}
+.btnstyle img {
+  display: block;
+}
+.btnstyle:hover {
+  background-color: none;
+  
+}
+/* estilo dos botões */
+
+/* merge */
+#app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.title {
+  margin-bottom: 15px;
+  color: white;
+  font-family: Mchmc;
+  font-size: 48px;
+  font-weight: 400;
+}
+
+.readers {
+  margin: 12px 0px;
+  display: flex;
+  justify-items: center;
+  column-gap: 24px;
+}
+
+.btn-reader {
+  display: flex;
+  max-width: 200px;
+  max-height: 150px;
+  border-width: 1;
+  border-color: rgb(159, 32, 200);
+  border-style: solid;
+  background-color: rgba(159, 32, 200, 0.6);
+  border-radius: 10px;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  transition: all;
+  transition-duration: 0.3s;
+}
+
+.btn-reader:hover {
+  background-color: rgba(120, 24, 160, 0.4);
+  border-color: rgb(120, 24, 180);
+}
+
+.priority {
+  color: white;
+  font-family: Mchmc;
+  display: inline-block;
+  margin: 5px 0 0 5px;
+  font-weight: 500;
+}
+
+.folder {
+  border: 0px;
+  width: 100%;
+}
+/* merge */
+
+/* Responsividade */
+@media (max-width: 768px) {
+
+  nav {
+    font-size: 1.8rem;
+  }
+
+  .btnstyle {
+    font-size: 1.8rem;
+    width: 120px;
+    height: 50px;
+  }
+
+  .title {
+    font-size: 2.5rem;
+  }
+
+  .logo {
+    margin-top: -150px;
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    font-size: 12px;
+    min-height: 140vh;
+    width: 100%;
+  }
+
+  nav {
+    font-size: 1.5rem;
+  }
+
+  .btnstyle {
+    font-size: 1.8rem;
+    width: 99px;
+    height: 50px;
+  }
+
+  .btnstyle img {
+    width: 21px;
+    height: 15px;
+  }
+  .btnhome{
+    height: 100px;
+  }
+  .title {
+    font-size: 2rem;
+    padding-left: 20px;
+  }
+
+  .logo {
+    margin-top: -100px;
+    width: 300px;
+    height: 300px;
+  }
+
+  .readers {
+    flex-direction: column;
+    row-gap: 12px;
+    column-gap: 0;
+  }
+  .folder {
+    border: 0px;
+    width: 50%;
+    height: 50%;
+  }
+
+  .btn-reader {
+    width: 100%;
+    height: auto;
+    padding: 10px;
+  }
+}

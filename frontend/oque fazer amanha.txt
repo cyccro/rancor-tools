@@ -1,0 +1,8 @@
+montar a responsividade do site
+
+montar rotas em type script criar pages entre outros
+
+pages:
+home
+contacts
+merge

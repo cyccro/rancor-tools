@@ -40,7 +40,7 @@ header {
 .logo {
   margin-top: -200px;
 }
-.navHome {
+.cardHome {
   font-family: Mchmc;
   padding: 2px;
   margin: 2px;
@@ -48,7 +48,6 @@ header {
   margin-top: -100px;
   font-size: 35px;
   color: white;
-
 }
 
 /* nav */
@@ -67,20 +66,40 @@ header {
   color: white;
   background-color: #6241d9;
 }
-.btnhome{
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 30px;
-  cursor: pointer;
-}
 .btnstyle img {
-  display: block;
+  width: 35px;
+  height: 25px;
 }
 .btnstyle:hover {
-  background-color: none;
-  
+  background-color: rgb(61, 60, 60);
+  border-top: 5px solid #84808a;
+  border-bottom: 5px solid #282829;
+  border-left: 1px solid black;
+  border-right: 1px solid black;
 }
+.btnhome {
+  font-family: Mchmc;
+  margin: 10px;
+  padding: 5px;
+  width: 200px;
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  border-radius: 2%;
+  color: white;
+  -webkit-border-radius: 2%;
+  -moz-border-radius: 2%;
+  -ms-border-radius: 2%;
+  -o-border-radius: 2%;
+}
+
+.btnhome img {
+  width: 100px;
+  height: 100px;
+}
+
 /* estilo dos botões */
 
 /* merge */
@@ -143,7 +162,6 @@ header {
 
 /* Responsividade */
 @media (max-width: 768px) {
-
   nav {
     font-size: 1.8rem;
   }
@@ -184,7 +202,7 @@ header {
     width: 21px;
     height: 15px;
   }
-  .btnhome{
+  .btnhome {
     height: 100px;
   }
   .title {

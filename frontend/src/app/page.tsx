@@ -25,10 +25,10 @@ async function download(r1: File[], r2: File[], type: AddonType) {
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } else {
-      throw 'non knowed'
+      console.log(await res.text())
     }
   } catch (e) {
-    console.error(e, 'error kkk');
+    console.log(e, 'error kkk');
   }
 }
 export default function Home() {
@@ -43,10 +43,9 @@ export default function Home() {
           <FolderInput name="inp1" onInput={(files) => r1.push(...files)} />
           <FolderInput name="inp2" onInput={(files) => r2.push(...files)} />
         </div>
-        <DropDown name="addon_type" dropname="Select Addon Type" contents={["Behavior pack", "Resource pack", "Complete Addon"]} onSelect={(ev) => {
-          addonType = AddonType[ev.target.value as any] as any as number;
-          console.log(addonType);
-        }} />
+        <DropDown name="addon_type" dropname="Select Addon Type" contents={["Behavior pack", "Resource pack", "Complete Addon"]} onSelect={(ev) =>
+          addonType = AddonType[ev.target.value as any] as any as number
+        } />
         <button onClick={() => download(r1, r2, addonType)}>Download merge</button>
       </div>
     </div>

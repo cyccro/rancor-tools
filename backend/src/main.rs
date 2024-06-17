@@ -1,3 +1,4 @@
+mod addons;
 mod routes;
 use routes::routes;
 

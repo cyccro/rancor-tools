@@ -6,19 +6,13 @@ use axum::{
     routing::post,
     Router,
 };
-use serde::{Deserialize, Serialize};
 use std::{fs::File, io::Write};
 use tower_http::cors::CorsLayer;
 use zip::write::{FileOptions, SimpleFileOptions};
 
-use crate::addons::Manifest;
+use crate::addons::{item_texture::ItemTxt, manifest::Manifest};
 
-#[derive(Serialize, Deserialize)]
-struct FileData {
-    content: String,
-    name: String,
-}
-async fn create_manifest(
+fn create_manifest(
     zip: &mut zip::ZipWriter<File>,
     options: FileOptions<'_, ()>,
     mut manifests: Vec<Manifest>,
@@ -32,6 +26,15 @@ async fn create_manifest(
         }
     }
 }
+fn create_item_textures(
+    zip: &mut zip::ZipWriter<File>,
+    options: FileOptions<'_, ()>,
+    textures: ItemTxt,
+) {
+    zip.start_file("textures/item_texture.json", options)
+        .unwrap();
+    zip.write(textures.to_string().unwrap().as_bytes());
+}
 fn server_error<T: Into<String>>(err: T) -> (StatusCode, String) {
     (StatusCode::INTERNAL_SERVER_ERROR, err.into())
 }
@@ -43,7 +46,9 @@ async fn handle_files(mut multipart: Multipart) -> Result<impl IntoResponse, (St
         SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
 
     let mut zip = zip::ZipWriter::new(zipfile);
+
     let mut manifests: Vec<Manifest> = vec![];
+    let mut item_txt: Option<ItemTxt> = None;
 
     while let Ok(Some(field)) = multipart.next_field().await {
         let comp_file_name = field.file_name().unwrap().to_string();
@@ -53,20 +58,44 @@ async fn handle_files(mut multipart: Multipart) -> Result<impl IntoResponse, (St
                 return Err(server_error(format!("Could not read file {}. By now addons with sound files and mcstructure ain't able to merge", comp_file_name)));
             }
         };
-
-        let file_name = {
-            let split = comp_file_name.split("/").collect::<Vec<&str>>();
-            if split[split.len() - 1] == "manifest.json" {
-                let content = String::from_utf8(bytes.clone().into_iter().collect()).unwrap();
-                match Manifest::from_string(content.clone()) {
-                    Ok(manifest) => manifests.push(manifest),
-                    Err(_) => {
-                        return Err(server_error(
-                            "Could not read manifest file. Check if it's a valid one",
-                        ));
+        let content = String::from_utf8(bytes.clone().into_iter().collect()).unwrap();
+        let split = comp_file_name.split("/").collect::<Vec<&str>>();
+        {
+            match split[split.len() - 1] {
+                "manifest.json" => {
+                    match Manifest::from_string(content.clone()) {
+                        Ok(manifest) => manifests.push(manifest),
+                        Err(e) => {
+                            return Err(server_error(format!("Could not read manifest file {}. Given error during serialization: {}",comp_file_name, e)));
+                        }
+                    };
+                }
+                "item_texture.json" => {
+                    match ItemTxt::from_string(content.clone()) {
+                        Ok(mut txt) => if let Some(ref item_txt) = item_txt {
+                            txt.concat(item_txt.clone());
+                        }else{
+                            item_txt = Some(txt);
+                        }
+                        Err(e) => {
+                            return Err(server_error(format!("Could not read item textures file {}. Given error during serialization: {}", comp_file_name, e)))
+                        }
                     }
-                };
+                }
+                _ => {
+                    println!("I dont think this was implemented yet {}", split[split.len() - 1]);
+                }
             }
+        }
+        let file_name = {
+            match Manifest::from_string(content.clone()) {
+                Ok(manifest) => manifests.push(manifest),
+                Err(_) => {
+                    return Err(server_error(
+                        "Could not read manifest file. Check if it's a valid one",
+                    ));
+                }
+            };
             if split[1] == "scripts" {
                 format!(
                     "{}_{}{}",
@@ -91,7 +120,8 @@ async fn handle_files(mut multipart: Multipart) -> Result<impl IntoResponse, (St
     if manifests.len() < 2 {
         return Err(server_error("There are not enough manifests for merging"));
     }
-    create_manifest(&mut zip, zip_options, manifests).await;
+    create_manifest(&mut zip, zip_options, manifests);
+    create_item_textures(&mut zip, zip_options, item_txt);
     match zip.finish() {
         //finishes the zip management
         Ok(_) => {

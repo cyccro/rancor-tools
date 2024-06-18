@@ -95,32 +95,3 @@ impl Manifest {
         serde_json::from_str(&str)
     }
 }
-/*{
-    "format_version": 2,
-    "header": {
-        "name": "BEHAVIOR MERGE MADE BY RANCOR-TOOLS WEBSITE(CODE CREATED BY CYCRO)",
-        "description": "PLEASE PUT THE NAME OF THE MERGED ADDON AND DESCRIPTION",
-        "uuid": "FIRST UUID",
-        "version": [ 1, 0, 0 ],
-        "min_engine_version": [ 1, 20, 80 ]
-    },
-    "modules": [{
-        "type": "data | resources; set as 'data' or 'resources' depending on the type of the pack",
-        "uuid": "UUID 2",
-        "version": [ 1, 0, 0 ]
-    },{
-        "type": "script",
-        "language": "javascript",
-        "uuid": "UUID 3",
-        "entry": "scripts/main.js",
-        "version": [ 1, 0, 0 ],
-        "remove this": "if the pack is resourcepack or behavior pack that does not use scripts, remove this, object"
-    }],
-    "dependencies": [{
-        "module_name": "@minecraft/server",
-        "version": "1.12.0-beta"
-    },{
-        "module_name": "@minecraft/server-ui",
-        "version": "1.2.0-beta"
-    }]
-}*/

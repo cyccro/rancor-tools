@@ -4,7 +4,7 @@ import { getRoutes } from "@/api/routes";
 export default function Home() {
   return (
     <div className="flex flex-col items-center">
-      <h1 className="text-3xl mt-12 absolute">Rancor tools</h1>
+      <Image></Image>
       <div className="flex flex-col teste justify-center items-center min-h-screen">
         <div className="flex gap-x-5">
           {getRoutes().map(route =>

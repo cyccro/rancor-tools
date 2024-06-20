@@ -1,9 +1,7 @@
-"use client";
 import { useState } from "react";
 
 export default function FolderInput({ name, onInput }: { name: string, onInput: (files: File[]) => void }) {
 	const [fileLen, setlen] = useState(0);
-	const [files, setfiles] = useState([] as File[]);
 	const handleChange = (ev: InputEvent) => {
 		const _files = (ev.target as HTMLInputElement).files!;
 		const len = _files.length;
@@ -18,7 +16,7 @@ export default function FolderInput({ name, onInput }: { name: string, onInput: 
 					<img src="./folder-svgrepo-com.svg" alt="input folder" className="w-32" />
 				</label>
 			</div>
-			<input type="file" id={name} onChange={handleChange} webkitdirectory="true" className="hidden" />
+			<input type="file" id={name} onChange={handleChange as any} webkitdirectory="true" className="hidden" />
 		</div>
 	);
 }

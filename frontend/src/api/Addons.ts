@@ -1,5 +1,5 @@
 export enum AddonType {
-	"Behavior pack",
-	"Resource pack",
-	"Complete Addon"
+	"Behavior pack" = "behavior",
+	"Resource pack" = "resource",
+	"Complete Addon" = "addon"
 }

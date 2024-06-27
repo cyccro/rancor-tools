@@ -1,102 +1,83 @@
+use std::{fs, io::{Read,Write}};
 use axum::{
     body::Bytes,
-    extract::{DefaultBodyLimit, Multipart},
-    http::{header, StatusCode},
-    response::{AppendHeaders, IntoResponse},
+    extract::{DefaultBodyLimit, Multipart, Path},
+    http::{header,StatusCode},
+    response::{AppendHeaders,IntoResponse},
     routing::post,
     Router,
 };
-use serde::{Deserialize, Serialize};
-use std::{fs::File, io::Write};
 use tower_http::cors::CorsLayer;
-use zip::write::{FileOptions, SimpleFileOptions};
+use uuid::Uuid;
+use zip::{ZipWriter,write::SimpleFileOptions};
 
-use crate::addons::Manifest;
-
-#[derive(Serialize, Deserialize)]
-struct FileData {
-    content: String,
-    name: String,
-}
-async fn create_manifest(
-    zip: &mut zip::ZipWriter<File>,
-    options: FileOptions<'_, ()>,
-    mut manifests: Vec<Manifest>,
-) {
-    if let [first, second, ..] = &mut manifests[..2] {
-        if let Ok(result) = Manifest::new(first, second).to_string() {
-            zip.start_file("manifest.json", options).unwrap();
-            zip.write(result.as_bytes()).unwrap();
-        } else {
-            println!("Error during parsing manifest struct to json")
-        }
+pub fn create_zip_from_path(path:String) -> std::io::Result<ZipWriter<std::fs::File>> {
+    match fs::File::create(path) {
+        Ok(file) => Ok(ZipWriter::new(file)),
+        Err(e) => Err(e)
     }
 }
-fn server_error<T: Into<String>>(err: T) -> (StatusCode, String) {
-    (StatusCode::INTERNAL_SERVER_ERROR, err.into())
+
+pub fn server_err<S: Into<String>>(err: S) -> (StatusCode, String) {
+    (StatusCode::OK, err.into())
 }
-async fn handle_files(mut multipart: Multipart) -> Result<impl IntoResponse, (StatusCode, String)> {
-    let output_name = "merged_files.zip";
-    let zipfile = File::create(output_name).unwrap();
 
-    let zip_options =
-        SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
-
-    let mut zip = zip::ZipWriter::new(zipfile);
-    let mut manifests: Vec<Manifest> = vec![];
-
-    while let Ok(Some(field)) = multipart.next_field().await {
-        let comp_file_name = field.file_name().unwrap().to_string();
-        let bytes = match field.bytes().await {
-            Ok(bytes) => bytes,
-            Err(_) => {
-                return Err(server_error(format!("Could not read file {}. By now addons with sound files and mcstructure ain't able to merge", comp_file_name)));
-            }
-        };
-
-        let file_name = {
-            let split = comp_file_name.split("/").collect::<Vec<&str>>();
-            if split[split.len() - 1] == "manifest.json" {
-                let content = String::from_utf8(bytes.clone().into_iter().collect()).unwrap();
-                match Manifest::from_string(content.clone()) {
-                    Ok(manifest) => manifests.push(manifest),
-                    Err(_) => {
-                        return Err(server_error(
-                            "Could not read manifest file. Check if it's a valid one",
-                        ));
+async fn finish_res(Path(path):Path<String>) -> Result<impl IntoResponse, (StatusCode,String)> {
+    let output_path = format!("output_files/{}.zip",path.clone());
+    let dir_path = format!("created_files/{}",path);
+    
+    let files = match fs::read_dir(dir_path.clone()) {
+        Err(e) => return Err(server_err(format!("{:#?}. Didnt find path created_files/{}",e, path))),
+        Ok(dir) => dir,
+    };
+    let mut output = match create_zip_from_path(output_path.clone()) {
+        Err(e) => return Err(server_err(format!("{e}"))),
+        Ok(zip) => zip
+    };
+    let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    for file in files {
+        if let Ok(file) = file {
+            let path = file.path();
+            let opened = match std::fs::File::open(&path) {
+                Ok(file) => file,
+                Err(e) => {
+                    return Err(server_err(format!("{e} could not read file")));
+                }
+            };
+            let mut reader = match zip::ZipArchive::new(opened) {
+                Ok(zip) => zip,
+                Err(_) => continue
+            };
+            for i in 0..reader.len(){
+                let mut inzip_file = match reader.by_index(i){
+                    Ok(file) => file,
+                    Err(_) => continue,
+                };
+                let mut bytes:Vec<u8> = Vec::new();
+                let _ = inzip_file.read_to_end(&mut bytes);
+                let name = {
+                    let temp = inzip_file.name();
+                    if let Some(idx) = temp.find("/") {
+                        &temp[idx..]
+                    }else{
+                        temp
+                    }
+                };
+                if let Ok(_) = output.start_file(name, opts){
+                    if let Err(e) = output.write(&bytes[..]){
+                        return Err(server_err(format!("Error on write file {}", e)));
                     }
                 };
             }
-            if split[1] == "scripts" {
-                format!(
-                    "{}_{}{}",
-                    split[0],
-                    split[1],
-                    &comp_file_name[(1 + split[0].len() + split[1].len())..]
-                )
-            } else if let Some(idx) = comp_file_name.find('/') {
-                (&comp_file_name[idx..]).to_string()
-            } else {
-                comp_file_name
-            }
-        };
-        if let Ok(_) = zip.start_file(file_name, zip_options) {
-            //Creates a file, if not error(duplicated file) writes into it
-            if let Err(e) = zip.write(&bytes[..]) {
-                return Err(server_error(format!("Error on write file {}", e)));
-            }
-            continue;
         }
     }
-    if manifests.len() < 2 {
-        return Err(server_error("There are not enough manifests for merging"));
-    }
-    create_manifest(&mut zip, zip_options, manifests).await;
-    match zip.finish() {
-        //finishes the zip management
+    match output.finish() {
         Ok(_) => {
-            let buffer = std::fs::read(output_name).unwrap();
-            let bytes = Bytes::from(buffer);
+            let content = match fs::read(output_path.clone()){
+                Ok(content) => content,
+                Err(_) => return Err(server_err("internal error: not possible to read file"))
+            };
+            let bytes = Bytes::from(content);
             let headers = AppendHeaders([
                 (header::CONTENT_TYPE, "application/zip"),
                 (
@@ -104,18 +85,73 @@ async fn handle_files(mut multipart: Multipart) -> Result<impl IntoResponse, (St
                     "inline; filename=\"merged_addons.zip\"",
                 ),
             ]);
-            let _ = std::fs::remove_file(output_name);
-            Ok((headers, bytes))
+            fs::remove_dir_all(dir_path).unwrap();
+            fs::remove_file(output_path).unwrap();
+            Ok((headers,bytes))
+
         }
         Err(e) => {
-            let _ = std::fs::remove_file(output_name);
-            Err(server_error(format!("{}", e)))
+            Err(server_err(format!("{e}")))
         }
+        
     }
 }
+
+async fn process_res(
+    Path(path): Path<String>,
+    mut multipart: Multipart,
+) -> Result<impl IntoResponse, (StatusCode,String)>{
+    let name = format!("created_files/{}/{}.zip", path, Uuid::new_v4());
+    if let Err(e) = fs::create_dir_all(format!("created_files/{}", path)) {
+        return Err(server_err(format!("{:#?}", e)));
+    };
+    let file = match fs::File::create(name.clone()) {
+        Ok(file) => file,
+        Err(e) => return Err(server_err(format!("{:#?}", e))),
+    };
+    let mut zip = zip::ZipWriter::new(file);
+    let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    while let Ok(Some(field)) = multipart.next_field().await {
+        let complete_name = match field.file_name() {
+            Some(name) => name.to_string(),
+            None => continue,
+        };
+        let bytes = match field.bytes().await {
+            Ok(bytes) => bytes,
+            Err(e) => return Err(server_err(format!("{:#?}", e))),
+        };
+        /*{
+            let split = complete_name.split("/").collect::<Vec<&str>>();
+            match split[split.len() - 1] {
+                "manifest.json" => {}
+                "item_texture.json" => {}
+                "terrain_texture.json" => {}
+                _ => {}
+            }
+        }*/
+        let file_name = if let Some(idx) = complete_name.find("/") {
+            (&complete_name[idx..]).to_string()
+        } else {
+            complete_name
+        };
+        if let Ok(_) = zip.start_file(file_name, opts) {
+            if let Err(e) = zip.write(&bytes[..]) {
+                return Err(server_err(format!("Could not read file {}", e)));
+            }
+        }
+    }
+    match zip.finish() {
+        Ok(_) => Ok(format!("Success on creating file: {}", name)),
+        Err(e) => Err(server_err(format!("{:#?}", e))),
+    }
+}
+
 pub fn routes() -> Router {
     Router::new()
-        .route("/merge", post(handle_files))
-        .layer(DefaultBodyLimit::max(1 << 24)) //16MB
+        .route(
+            "/merge/:id",
+            post(process_res).layer(DefaultBodyLimit::max(1 << 24)),
+        )
+        .route("/finish_merge/:id", post(finish_res))
         .layer(CorsLayer::permissive())
 }

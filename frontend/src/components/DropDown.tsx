@@ -6,7 +6,7 @@ export default function DropDown({ name, dropname, contents, onSelect }: { name:
 			<label htmlFor={name}>{dropname}</label>
 			<select name={name} id={name} onChange={onSelect}>
 				{contents.map(content =>
-					<option value={content}>{content}</option>
+					<option key={content} value={content}>{content}</option>
 				)}
 			</select>
 		</div>

@@ -1,99 +1,77 @@
-use std::{fs, io::{Read,Write}};
+use std::{fs::{self, File, OpenOptions}, io::{Read,Write}};
 use axum::{
     body::Bytes,
     extract::{DefaultBodyLimit, Multipart, Path},
     http::{header,StatusCode},
     response::{AppendHeaders,IntoResponse},
-    routing::post,
+    routing::{get, post},
     Router,
 };
 use tower_http::cors::CorsLayer;
 use uuid::Uuid;
-use zip::{ZipWriter,write::SimpleFileOptions};
-
-pub fn create_zip_from_path(path:String) -> std::io::Result<ZipWriter<std::fs::File>> {
-    match fs::File::create(path) {
-        Ok(file) => Ok(ZipWriter::new(file)),
-        Err(e) => Err(e)
-    }
-}
+use zip::{write::SimpleFileOptions, ZipArchive, ZipWriter};
 
 pub fn server_err<S: Into<String>>(err: S) -> (StatusCode, String) {
     (StatusCode::OK, err.into())
 }
 
-async fn finish_res(Path(path):Path<String>) -> Result<impl IntoResponse, (StatusCode,String)> {
-    let output_path = format!("output_files/{}.zip",path.clone());
+async fn delete_files(Path(path):Path<String>) {
+    let output_path = format!("output_files/{}.zip",path);
     let dir_path = format!("created_files/{}",path);
+    if let Err(e) = fs::remove_dir_all(dir_path){
+        println!("{e}");
+    };
+    if let Err(e) = fs::remove_file(output_path) {
+        println!("{e}");
+    };
     
-    let files = match fs::read_dir(dir_path.clone()) {
-        Err(e) => return Err(server_err(format!("{:#?}. Didnt find path created_files/{}",e, path))),
-        Ok(dir) => dir,
-    };
-    let mut output = match create_zip_from_path(output_path.clone()) {
-        Err(e) => return Err(server_err(format!("{e}"))),
-        Ok(zip) => zip
-    };
-    let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
-    for file in files {
-        if let Ok(file) = file {
-            let path = file.path();
-            let opened = match std::fs::File::open(&path) {
-                Ok(file) => file,
-                Err(e) => {
-                    return Err(server_err(format!("{e} could not read file")));
-                }
-            };
-            let mut reader = match zip::ZipArchive::new(opened) {
-                Ok(zip) => zip,
-                Err(_) => continue
-            };
-            for i in 0..reader.len(){
-                let mut inzip_file = match reader.by_index(i){
-                    Ok(file) => file,
-                    Err(_) => continue,
-                };
-                let mut bytes:Vec<u8> = Vec::new();
-                let _ = inzip_file.read_to_end(&mut bytes);
-                let name = {
-                    let temp = inzip_file.name();
-                    if let Some(idx) = temp.find("/") {
-                        &temp[idx..]
-                    }else{
-                        temp
-                    }
-                };
-                if let Ok(_) = output.start_file(name, opts){
-                    if let Err(e) = output.write(&bytes[..]){
-                        return Err(server_err(format!("Error on write file {}", e)));
-                    }
-                };
-            }
-        }
-    }
-    match output.finish() {
-        Ok(_) => {
-            let content = match fs::read(output_path.clone()){
-                Ok(content) => content,
-                Err(_) => return Err(server_err("internal error: not possible to read file"))
-            };
-            let bytes = Bytes::from(content);
-            let headers = AppendHeaders([
-                (header::CONTENT_TYPE, "application/zip"),
-                (
-                    header::CONTENT_DISPOSITION,
-                    "inline; filename=\"merged_addons.zip\"",
-                ),
-            ]);
-            fs::remove_dir_all(dir_path).unwrap();
-            fs::remove_file(output_path).unwrap();
-            Ok((headers,bytes))
+}
 
-        }
-        Err(e) => {
-            Err(server_err(format!("{e}")))
-        }
-        
+async fn finish_res(Path(path):Path<String>) -> Result<impl IntoResponse, (StatusCode,String)> {
+    let output_path = format!("output_files/{}.zip",path);
+    let content = match fs::read(&output_path){
+        Ok(content) => content,
+        Err(_) => return Err(server_err("internal error: not possible to read file"))
+    };
+    let bytes = Bytes::from(content);
+    let headers = AppendHeaders([
+        (header::CONTENT_TYPE, "application/zip"),
+        (header::CONTENT_DISPOSITION,"inline; filename=\"merged_addons.zip\"",),
+    ]);
+    Ok((headers,bytes))
+
+}
+
+fn write_zip_to_zip(file:File, target:File) -> std::io::Result<()> {
+    let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    let mut writer = ZipWriter::new(target);
+    let mut reader = match ZipArchive::new(file) {
+        Ok(file) => file,
+        Err(e) => return Err(e.into()),
+    };
+    for i in 0..reader.len() {
+        let mut zipped_file = match reader.by_index(i) {
+            Ok(file) => file,
+            Err(e) => {
+                println!("{e}");
+                continue;
+            }
+        };
+        let mut bytes:Vec<u8> = Vec::new();
+        if let Err(e) = zipped_file.read_to_end(&mut bytes){
+            println!("{e}");
+            continue;
+        };
+        let name = &zipped_file.name()[1..]; //generally starts with /
+        if let Ok(_) = writer.start_file(name, opts){
+            if let Err(e) = writer.write(bytes.as_slice()) {
+                println!("{e}");
+            }
+        };
+    }
+    match writer.finish() {
+        Ok(_) => Ok(()),
+        Err(e) => Err(e.into())
     }
 }
 
@@ -109,7 +87,7 @@ async fn process_res(
         Ok(file) => file,
         Err(e) => return Err(server_err(format!("{:#?}", e))),
     };
-    let mut zip = zip::ZipWriter::new(file);
+    let mut zip = zip::ZipWriter::new(&file);
     let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
     while let Ok(Some(field)) = multipart.next_field().await {
         let complete_name = match field.file_name() {
@@ -141,7 +119,14 @@ async fn process_res(
         }
     }
     match zip.finish() {
-        Ok(_) => Ok(format!("Success on creating file: {}", name)),
+        Ok(_) => {
+            let path = format!("output_files/{}.zip", path);
+            let target_file = OpenOptions::new().write(true).create(true).append(true).open(path).unwrap();
+            if let Err(e) = write_zip_to_zip(File::open(name).unwrap(),target_file) {
+                println!("{:?}",e);
+            };
+            Ok("Sucess writing piece to final result")
+        }
         Err(e) => Err(server_err(format!("{:#?}", e))),
     }
 }
@@ -150,8 +135,9 @@ pub fn routes() -> Router {
     Router::new()
         .route(
             "/merge/:id",
-            post(process_res).layer(DefaultBodyLimit::max(1 << 24)),
+            post(process_res).layer(DefaultBodyLimit::max(1 << 32)),
         )
         .route("/finish_merge/:id", post(finish_res))
+        .route("/mergedel/:id", get(delete_files))
         .layer(CorsLayer::permissive())
 }

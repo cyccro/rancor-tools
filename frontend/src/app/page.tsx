@@ -22,6 +22,7 @@ async function finishDownload(uuid: string) {
     anchor.click();
     document.body.removeChild(anchor);
     URL.revokeObjectURL(anchor.href);
+    await fetch("http://localhost:8080/mergedel/"+uuid);
   }catch(e){
     console.log(e, 'error');
   }

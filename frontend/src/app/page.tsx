@@ -4,17 +4,17 @@ import { uuid } from "@/api/others";
 import DropDown from "@/components/DropDown";
 import FolderInput from "@/components/FolderInput";
 
-//A request with more than N files for some reason stop the requests, for security, 50 will be the max
-const maxFiles = 50;
+async function download(r1: File[], type: AddonType) {
+  const id = uuid();
 
-async function finishDownload(uuid: string) {
-  const url = "http://localhost:8080/finish_merge/"+uuid;
-  try{
-    const response = await fetch(url, {
-      method:'POST'
+  const form = new FormData();
+  for (const file of r1) form.append("r1", file);
+  try {
+    const res = await fetch("http://localhost:8080/merge/" + id, {
+      method: 'POST',
+      body: form
     });
-    const blob = await response.blob();
-    console.log(blob);
+    const blob = await res.blob();
     const anchor = document.createElement('a');
     anchor.href = URL.createObjectURL(blob);
     anchor.download = "merge.zip";
@@ -22,46 +22,9 @@ async function finishDownload(uuid: string) {
     anchor.click();
     document.body.removeChild(anchor);
     URL.revokeObjectURL(anchor.href);
-    await fetch("http://localhost:8080/mergedel/"+uuid);
-  }catch(e){
-    console.log(e, 'error');
+  } catch (e) {
+    console.warn(e, "Given error during sending things.");
   }
-}
-
-async function download(r1: File[], type: AddonType) {
-  const id = uuid();
-  const len = r1.length;
-  if(len == 0) return console.log("No files were given");
-  let i = len;
-  console.time("label");
-  const fn = async () => {
-    if (i <= 0) {
-      await finishDownload(id);
-      clearInterval(interval);
-      console.timeEnd("label");
-      return;
-    }
-    const form = new FormData();
-    const this_lim = (i - maxFiles) * Number(i > maxFiles);
-    for (; i > this_lim; i--)
-      if (i < 0) return;
-      else form.append('r1', r1[i]);
-
-    try {
-      const res = await fetch("http://localhost:8080/merge/" + id, {
-        method: 'POST',
-        body: form
-      });
-      console.log(await res.text());
-      setTimeout(fn,125);
-    } catch (e) {
-      console.warn(e, "Given error during sending things.")
-      console.timeEnd("label");
-      clearInterval(interval);
-    }
-  }
-  let interval = setTimeout(fn, 125);
-
 }
 export default function Home() {
   const r1: File[] = [];

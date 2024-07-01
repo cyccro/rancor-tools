@@ -32,7 +32,20 @@ fn write_on_file(
     }
     Ok(())
 }
-
+fn write_item_txt(zip: &mut ZipWriter<&std::fs::File>, opts: SimpleFileOptions, bytes: &[u8]) {
+    write_on_file(zip, "textures/item_texture.json".to_string(), opts, bytes);
+}
+fn write_block_txt(zip: &mut ZipWriter<&std::fs::File>, opts: SimpleFileOptions, bytes: &[u8]) {
+    write_on_file(
+        zip,
+        "textures/terrain_texture.json".to_string(),
+        opts,
+        bytes,
+    );
+}
+fn write_errs(zip: &mut ZipWriter<&std::fs::File>, opts: SimpleFileOptions, bytes: &[u8]) {
+    write_on_file(zip, "log_errs.txt".to_string(), opts, bytes);
+}
 fn register_by_name(
     name: &str,
     complete_name: &String,
@@ -154,24 +167,12 @@ pub async fn process_res(
         Ok(_) => {}
         Err(e) => return Err(e),
     };
-    let _ = write_on_file(
-        &mut zip,
-        "textures/item_texture.json".to_string(),
-        opts,
-        item_txt.to_string().unwrap().as_bytes(),
-    );
-    let _ = write_on_file(
-        &mut zip,
-        "textures/terrain_texture.json".to_string(),
-        opts,
-        block_txt.to_string().unwrap().as_bytes(),
-    );
-    let _ = write_on_file(
-        &mut zip,
-        "error_logs.txt".to_string(),
-        opts,
-        log_errs.join("\n").as_bytes(),
-    );
+    {
+        let zipref = &mut zip;
+        write_item_txt(zipref, opts, item_txt.to_string().unwrap().as_bytes());
+        write_block_txt(zipref, opts, block_txt.to_string().unwrap().as_bytes());
+        write_errs(zipref, opts, log_errs.join("\n").as_bytes());
+    };
     match zip.finish() {
         Ok(_) => {
             let bytes = match fs::read(&name) {
